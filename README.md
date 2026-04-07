@@ -62,8 +62,6 @@ http://localhost:8080/swagger/openapi.json
 ```
 <br>
 
----
-
 ### Структура проекта
 
 internal/domain/task/
