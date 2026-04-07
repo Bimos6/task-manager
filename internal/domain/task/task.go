@@ -1,7 +1,6 @@
 package task
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -18,8 +17,7 @@ type Task struct {
 	Title          string          `json:"title"`
 	Description    string          `json:"description"`
 	Status         Status          `json:"status"`
-	IsRecurring    bool            `json:"is_recurring" gorm:"default:false"`
-	RecurrenceType string          `json:"recurrence_type,omitempty"`
+	DueDate        time.Time       `json:"due_date"`
 	RecurrenceRule *RecurrenceRule `json:"recurrence_rule,omitempty" gorm:"type:jsonb"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
@@ -34,25 +32,6 @@ func (s Status) Valid() bool {
 	}
 }
 
-func (t *Task) Normalize() {
-	if t.RecurrenceRule != nil && t.RecurrenceRule.Type != "" {
-		t.IsRecurring = true
-		t.RecurrenceType = t.RecurrenceRule.Type
-	} else {
-		t.IsRecurring = false
-		t.RecurrenceType = ""
-		t.RecurrenceRule = nil
-	}
-}
-
-func (t *Task) BeforeSave() error {
-	t.Normalize()
-
-	if t.IsRecurring && t.RecurrenceRule != nil {
-		if err := t.RecurrenceRule.Validate(); err != nil {
-			return fmt.Errorf("invalid recurrence rule: %w", err)
-		}
-	}
-
-	return nil
+func (t *Task) IsRecurring() bool {
+	return t.RecurrenceRule != nil && t.RecurrenceRule.Type != ""
 }
