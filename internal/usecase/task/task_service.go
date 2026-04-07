@@ -10,14 +10,16 @@ import (
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo       Repository
+	recService *RecurrenceService
+	now        func() time.Time
 }
 
 func NewService(repo Repository) *Service {
 	return &Service{
-		repo: repo,
-		now:  func() time.Time { return time.Now().UTC() },
+		repo:       repo,
+		recService: NewRecurrenceService(),
+		now:        func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -27,10 +29,17 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*taskdomain.Ta
 		return nil, err
 	}
 
+	if normalized.RecurrenceRule != nil {
+		if err := normalized.RecurrenceRule.Validate(); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		}
+	}
+
 	model := &taskdomain.Task{
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
+		Title:          normalized.Title,
+		Description:    normalized.Description,
+		Status:         normalized.Status,
+		RecurrenceRule: normalized.RecurrenceRule,
 	}
 	now := s.now()
 	model.CreatedAt = now
@@ -62,12 +71,19 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (*tas
 		return nil, err
 	}
 
+	if normalized.RecurrenceRule != nil {
+		if err := normalized.RecurrenceRule.Validate(); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		}
+	}
+
 	model := &taskdomain.Task{
-		ID:          id,
-		Title:       normalized.Title,
-		Description: normalized.Description,
-		Status:      normalized.Status,
-		UpdatedAt:   s.now(),
+		ID:             id,
+		Title:          normalized.Title,
+		Description:    normalized.Description,
+		Status:         normalized.Status,
+		RecurrenceRule: normalized.RecurrenceRule,
+		UpdatedAt:      s.now(),
 	}
 
 	updated, err := s.repo.Update(ctx, model)
@@ -88,6 +104,36 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 
 func (s *Service) List(ctx context.Context) ([]taskdomain.Task, error) {
 	return s.repo.List(ctx)
+}
+
+func (s *Service) ListInRange(ctx context.Context, startDate, endDate time.Time) ([]taskdomain.Task, error) {
+	templates, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []taskdomain.Task
+
+	for _, t := range templates {
+		if t.RecurrenceRule != nil && t.RecurrenceRule.Type != "" {
+			dates, err := s.recService.GenerateDatesInRange(t.RecurrenceRule, startDate, endDate)
+			if err != nil {
+				continue
+			}
+
+			for _, date := range dates {
+				taskCopy := t
+				taskCopy.DueDate = date
+				result = append(result, taskCopy)
+			}
+		} else {
+			if !t.DueDate.Before(startDate) && !t.DueDate.After(endDate) {
+				result = append(result, t)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func validateCreateInput(input CreateInput) (CreateInput, error) {
