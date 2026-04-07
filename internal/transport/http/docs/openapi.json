@@ -20,7 +20,7 @@
     "/api/v1/tasks": {
       "get": {
         "tags": ["Tasks"],
-        "summary": "List tasks",
+        "summary": "List tasks (templates only)",
         "responses": {
           "200": {
             "description": "Task list",
@@ -56,6 +56,41 @@
             }
           },
           "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/api/v1/tasks/range": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "List tasks in date range with recurrence expansion",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date", "example": "2025-04-01" },
+            "description": "Start date (YYYY-MM-DD). Default: today"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date", "example": "2025-04-30" },
+            "description": "End date (YYYY-MM-DD). Default: today + 30 days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task list with expanded recurring tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Task" }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -169,6 +204,15 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-04-08T09:00:00Z",
+            "description": "Due date for the task"
+          },
+          "recurrence_rule": {
+            "$ref": "#/components/schemas/RecurrenceRule"
           }
         }
       },
@@ -188,6 +232,14 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-04-08T09:00:00Z"
+          },
+          "recurrence_rule": {
+            "$ref": "#/components/schemas/RecurrenceRule"
           }
         }
       },
@@ -205,6 +257,14 @@
             "enum": ["new", "in_progress", "done"],
             "example": "new"
           },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-04-08T09:00:00Z"
+          },
+          "recurrence_rule": {
+            "$ref": "#/components/schemas/RecurrenceRule"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -216,6 +276,43 @@
             "example": "2026-03-24T00:00:00Z"
           }
         }
+      },
+      "RecurrenceRule": {
+        "type": "object",
+        "description": "Recurrence rule for periodic tasks",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["daily", "monthly", "specific_dates", "parity"],
+            "example": "daily"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 2,
+            "description": "For daily: every N days"
+          },
+          "day_of_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "example": 15,
+            "description": "For monthly: day of month (1-31)"
+          },
+          "dates": {
+            "type": "array",
+            "items": { "type": "string", "format": "date" },
+            "example": ["2025-04-01", "2025-04-15"],
+            "description": "For specific_dates: list of dates"
+          },
+          "parity": {
+            "type": "string",
+            "enum": ["even", "odd"],
+            "example": "even",
+            "description": "For parity: even or odd days"
+          }
+        },
+        "required": ["type"]
       },
       "Error": {
         "type": "object",
