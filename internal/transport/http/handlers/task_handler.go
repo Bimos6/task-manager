@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -28,9 +29,10 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	created, err := h.usecase.Create(r.Context(), taskusecase.CreateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:          req.Title,
+		Description:    req.Description,
+		Status:         req.Status,
+		RecurrenceRule: req.RecurrenceRule,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -70,9 +72,10 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, err := h.usecase.Update(r.Context(), id, taskusecase.UpdateInput{
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      req.Status,
+		Title:          req.Title,
+		Description:    req.Description,
+		Status:         req.Status,
+		RecurrenceRule: req.RecurrenceRule,
 	})
 	if err != nil {
 		writeUsecaseError(w, err)
@@ -99,6 +102,39 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	tasks, err := h.usecase.List(r.Context())
+	if err != nil {
+		writeUsecaseError(w, err)
+		return
+	}
+
+	response := make([]taskDTO, 0, len(tasks))
+	for i := range tasks {
+		response = append(response, newTaskDTO(&tasks[i]))
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (h *TaskHandler) ListInRange(w http.ResponseWriter, r *http.Request) {
+	startDateStr := r.URL.Query().Get("start_date")
+	endDateStr := r.URL.Query().Get("end_date")
+
+	now := time.Now()
+	startDate := now
+	endDate := now.AddDate(0, 1, 0)
+
+	if startDateStr != "" {
+		if parsed, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			startDate = parsed
+		}
+	}
+	if endDateStr != "" {
+		if parsed, err := time.Parse("2006-01-02", endDateStr); err == nil {
+			endDate = parsed
+		}
+	}
+
+	tasks, err := h.usecase.ListInRange(r.Context(), startDate, endDate)
 	if err != nil {
 		writeUsecaseError(w, err)
 		return
